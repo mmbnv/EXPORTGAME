@@ -18,6 +18,7 @@ repo, they almost always want to **mod a game**, or to learn how a game was modd
     `uv tool install git+https://github.com/rehan-remade/universal-modder`.
   - Every group has `--help`:
     - `scan`: installed games, engine, anti-cheat, loaders, saves, routes
+    - `android`: turn a PC game folder into an installable Android game (APK): `scan` / `build` / `env`
     - `fal`: sprites, textures, PBR, 3D, rigs, SFX, music, voice, video via fal's REST API
     - `comfy`: images from a local ComfyUI server, with no API key
     - `sprite` / `render3d`: art → engine-ready frames (`render3d` needs Blender on PATH or `BLENDER=...`)
@@ -60,5 +61,11 @@ repo, they almost always want to **mod a game**, or to learn how a game was modd
   interpolation, no `out var`, no expression-bodied members.
 - **Tests:** `uv run --with pytest pytest -q tests`. CI also runs `um kb check --index` and
   `um publish check .`.
+- **Android export:** the PC-game → Android APK pipeline lives in the `portagent/` package (the iterative
+  porter) and is exposed to agents through `um android` (see `um/android.py`). The friendly entry point is
+  `python run.py` (menu) or `python run.py --gui`. It is self-contained and offline: it finds a JDK +
+  Android SDK/NDK in the app's own `tools/` folder first (`portagent/tools.py`), so no PATH edit is needed;
+  `scripts/bootstrap_android.ps1` installs them once on Windows. Tests for it live in
+  `tests/test_*.py` next to `um`'s own tests.
 - **Wording:** keep skills and docs agent-neutral ("the agent", not a product name) except in sections
   about one specific agent.

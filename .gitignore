@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# EXPORTGAME: local build outputs and the optional bundled toolchain
+exportgame_out/
+exportgame_run/
+exportgame_all/
+exportgame_memory.sqlite
+*.apk
+tools/

@@ -86,6 +86,28 @@ The agent starts with the **mod-any-game** skill and runs the same loop every ti
 9. package;
 10. write a field note for the next agent.
 
+## Port a game to Android (one command)
+
+Point it at a PC game folder and get an installable Android game back:
+
+```bash
+python run.py                                  # friendly menu: pick a folder -> build the APK
+um android build "C:\Games\MyGame" -o MyGame.apk   # or straight from the CLI
+um android scan  "C:\Games\MyGame"                 # just recon: engine, arch, DRM, feasibility
+um android env                                     # the discovered JDK / Android SDK / NDK
+```
+
+`um android build` runs the real pipeline (`ANALYZE → CHOOSE → DECOMPILE → EXECUTE → VERIFY`) and writes a
+**signed, aligned APK** that carries both `arm64-v8a` and `armeabi-v7a` native libraries, so one APK
+installs on any modern phone. It is self-contained and offline: it finds a JDK + Android SDK/NDK in the
+app's own `tools/` folder first, so there is no PATH edit. On Windows, prepare the toolchain once with
+`scripts\bootstrap_android.ps1` (portable JDK + SDK/NDK, no winget/choco, no registry changes).
+
+It fails honestly: a title with kernel-level anti-cheat/DRM is reported `impossible` (never faked) and a
+missing toolchain is reported `fail` with the reason. Full automatic code reconstruction for exotic engines
+is still evolving; heavy ARM64 runtime payloads (Box64/Wine/DXVK) are not vendored — the app names the
+missing library instead of pretending.
+
 ## A knowledge base that AIs write for AIs
 [`knowledge/`](knowledge/) holds **field notes**: how specific games were actually modded, decompiled and
 reverse-engineered. Each note gives:
@@ -142,6 +164,7 @@ A few notes from the community:
   <thead><tr><th width="62">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th><th width="170">Command</th><th>What it does</th></tr></thead>
   <tbody>
     <tr><td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/icons/scan-dark.svg"><img src="docs/media/icons/scan-light.svg" width="36" height="36" alt=""></picture></td><td><code>um scan</code></td><td>Find Steam/Epic/Xbox installs; fingerprint engine and version, .NET vs native, anti-cheat, installed loaders, save folders, ranked routes</td></tr>
+    <tr><td align="center"><code>🤖</code></td><td><code>um android</code></td><td><code>scan</code>, <code>build</code>, <code>env</code>. Turn a PC game folder into an <b>installable Android game (a signed APK)</b> — self-contained and offline, one APK with both <code>arm64-v8a</code> and <code>armeabi-v7a</code> so it runs on any modern phone. The friendly app is <code>python run.py</code></td></tr>
     <tr><td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/icons/fal-dark.svg"><img src="docs/media/icons/fal-light.svg" width="36" height="36" alt=""></picture></td><td><code>um fal</code></td><td><code>sprite</code>, <code>image</code>, <code>edit</code>, <code>rmbg</code>, <code>pixelate</code>, <code>upscale</code>, <code>texture</code>, <code>pbr</code>, <code>model3d</code>, <code>rig</code>, <code>sfx</code>, <code>music</code>, <code>voice</code>, <code>video</code>, <code>run</code>, <code>search</code>, <code>schema</code>, <code>price</code>. Plain REST, with a manifest of every generation</td></tr>
     <tr><td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/icons/comfy-dark.svg"><img src="docs/media/icons/comfy-light.svg" width="36" height="36" alt=""></picture></td><td><code>um comfy</code></td><td><code>status</code>, <code>image</code> (<code>--sprite</code> cuts it out), <code>run</code> (any workflow saved with Export (API)). Images from a local ComfyUI server, no API key</td></tr>
     <tr><td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/icons/sprite-dark.svg"><img src="docs/media/icons/sprite-light.svg" width="36" height="36" alt=""></picture></td><td><code>um sprite</code></td><td><code>cutout</code>, <code>fit</code>, <code>pixelate</code>, <code>palette</code>, <code>sheet</code>, <code>slice</code>, <code>frames</code>, <code>team-mask</code>, <code>seamless</code>, <code>preview</code></td></tr>

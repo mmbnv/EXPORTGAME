@@ -976,3 +976,36 @@ def test_path_hook_writes_a_posix_root(tmp_path):
     value = env_file.read_text().split('"')[1]
     prefix = value[:value.index("/bin:$PATH")]
     assert prefix.startswith("/") and ":" not in prefix, value
+
+
+# --------------------------------------------------------------------------- android export
+
+def test_um_android_scan_reports_engine(tmp_path):
+    from um import cli
+    game = tmp_path / "MyGodotGame"
+    (game / "data").mkdir(parents=True)
+    (game / "MyGodotGame.pck").write_bytes(b"GDPC" + b"\x00" * 32)   # Godot pack magic
+    (game / "MyGodotGame.exe").write_bytes(b"MZ" + b"\x00" * 64)
+    cli.main(["android", "scan", str(game)])                          # human report, exit 0
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        cli.main(["android", "scan", str(game), "--json"])
+    report = json.loads(buf.getvalue())
+    assert "engine" in report and "feasible" in report
+
+
+def test_um_android_env_reports_toolchain():
+    from um import cli
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        cli.main(["android", "env", "--json"])
+    info = json.loads(buf.getvalue())
+    assert "android_toolchain" in info and "tools" in info
+
+
+def test_um_android_missing_folder_exits(tmp_path):
+    from um import cli
+    with pytest.raises(SystemExit):
+        cli.main(["android", "scan", str(tmp_path / "does-not-exist")])

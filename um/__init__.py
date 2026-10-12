@@ -2,6 +2,7 @@
 
 Subcommands (see `um --help`):
   scan      find installed games and fingerprint one: engine, runtime, anti-cheat, mod loaders, routes
+  android   turn a PC game folder into an installable Android game (APK): scan / build / env
   fal       generate game assets with fal (sprites, textures, PBR, 3D, rigs, SFX, music, voice, video)
   comfy     generate images locally with ComfyUI (no API key)
   sprite    cut out, fit, pixelate, recolor and pack 2D sprites
