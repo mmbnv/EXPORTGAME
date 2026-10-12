@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exportgame"
+version = "0.2.0"
+description = "EXPORTGAME: turn any game folder into an installable Android game APK (ANALYZE/CHOOSE/EXECUTE/VERIFY/LEARN)"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+exportgame = "portagent.cli:main"
+exportgame-gui = "portagent.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["portagent*"]
