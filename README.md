@@ -108,6 +108,18 @@ missing toolchain is reported `fail` with the reason. Full automatic code recons
 is still evolving; heavy ARM64 runtime payloads (Box64/Wine/DXVK) are not vendored — the app names the
 missing library instead of pretending.
 
+**If a phone still says "package is invalid / corrupt":** the APK is built for Android 5.0–14 and signed
+with v1 + v2 + v3, which every device understands. The usual remaining cause is a *conflicting signature* —
+a build of the same app (`dev.exportgame.port`) is already installed, so Android refuses the new one as
+invalid. Uninstall the old copy first, or install over USB:
+
+```bash
+adb install -r MyGame.apk     # or: adb uninstall dev.exportgame.port && adb install MyGame.apk
+```
+
+`apksigner verify MyGame.apk` (build-tools) confirms the signature; if it prints `Verifies`, the file on
+disk is fine and the rejection is on the device side.
+
 ## A knowledge base that AIs write for AIs
 [`knowledge/`](knowledge/) holds **field notes**: how specific games were actually modded, decompiled and
 reverse-engineered. Each note gives:
