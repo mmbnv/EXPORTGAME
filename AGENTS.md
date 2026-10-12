@@ -67,5 +67,12 @@ repo, they almost always want to **mod a game**, or to learn how a game was modd
   Android SDK/NDK in the app's own `tools/` folder first (`portagent/tools.py`), so no PATH edit is needed;
   `scripts/bootstrap_android.ps1` installs them once on Windows. Tests for it live in
   `tests/test_*.py` next to `um`'s own tests.
+- **APK compatibility (do not regress):** `portagent/packager.py` builds `minSdk 21 / targetSdk 34` and
+  signs with **v1 + v2 + v3**. `apksigner` only emits a valid v1 (JAR) signature when
+  `--min-sdk-version` is 21; at 26 it silently skips it, and Android 5–6 phones verify only v1 and then
+  reject the APK as "invalid". The manifest also ships a launcher icon and marks the GLES `uses-feature`
+  as not required. `apksigner` appends `META-INF/MANIFEST.MF` after the `.SF` — that ordering is valid (the
+  `jarsigner` JarInputStream warning is a red herring; Android reads the central directory). The build runs
+  `apksigner verify` and only reports `ok` when `result.verified` is true.
 - **Wording:** keep skills and docs agent-neutral ("the agent", not a product name) except in sections
   about one specific agent.
