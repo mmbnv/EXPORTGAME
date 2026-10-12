@@ -149,6 +149,39 @@ class PackagerTests(unittest.TestCase):
         self.assertEqual(cfg["entry"], "IndieGame.exe")
         self.assertEqual(cfg["env"]["PAGENT_STRATEGY"], "native_dbt_box64")
 
+    def test_signed_without_a_stale_v1_block(self):
+        # A leftover v1 JAR signature (META-INF/*.SF with the manifest appended after it) is what
+        # makes package installers report "package is invalid / corrupt". minSdk is 26, so the APK
+        # must be v2/v3 only and carry no v1 files at all.
+        import subprocess
+        import zipfile
+
+        res = self._package("godot_dotnet")
+        self.assertEqual(res.status, "ok", msg=str(res.logs[-3:]))
+        with zipfile.ZipFile(res.apk) as z:
+            names = z.namelist()
+        self.assertFalse([n for n in names if n.endswith(".SF") or n.endswith(".RSA") or n == "META-INF/MANIFEST.MF"],
+                         "v1 JAR signature files must not be present (use --v1-signing-enabled false)")
+        apksigner = find_android_toolchain()["apksigner"]
+        out = subprocess.run([apksigner, "verify", "--verbose", res.apk],
+                             capture_output=True, text=True).stdout
+        self.assertIn("Verifies", out)
+        self.assertIn("APK Signature Scheme v2): true", out)
+        self.assertIn("JAR signing): false", out)
+
+    def test_native_lib_exports_the_jni_entry_points(self):
+        # PortActivity declares nativeBackend()/nativeInit(); if the .so doesn't export
+        # Java_<pkg>_PortActivity_<name> the app installs and then crashes on launch.
+        import zipfile
+
+        res = self._package("unity_il2cpp")
+        self.assertEqual(res.status, "ok", msg=str(res.logs[-3:]))
+        with zipfile.ZipFile(res.apk) as z:
+            so = z.read("lib/arm64-v8a/libportagent.so")
+        for name in (b"Java_dev_exportgame_port_PortActivity_nativeBackend",
+                     b"Java_dev_exportgame_port_PortActivity_nativeInit"):
+            self.assertIn(name, so, f"missing JNI symbol {name.decode()} in libportagent.so")
+
 
 @unittest.skipUnless(find_android_toolchain() is not None,
                      "Android SDK not installed (set ANDROID_HOME)")
