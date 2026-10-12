@@ -178,9 +178,30 @@ class PackagerTests(unittest.TestCase):
         self.assertEqual(res.status, "ok", msg=str(res.logs[-3:]))
         with zipfile.ZipFile(res.apk) as z:
             so = z.read("lib/arm64-v8a/libportagent.so")
-        for name in (b"Java_dev_exportgame_port_PortActivity_nativeBackend",
-                     b"Java_dev_exportgame_port_PortActivity_nativeInit"):
+        prefix = b"Java_" + res.package.replace(".", "_").encode() + b"_PortActivity_"
+        for name in (prefix + b"nativeBackend", prefix + b"nativeInit"):
             self.assertIn(name, so, f"missing JNI symbol {name.decode()} in libportagent.so")
+
+    def test_package_name_is_unique_per_game(self):
+        # Two different games must not share a package: a shared package makes the
+        # second install collide with the first ("package is invalid/conflicting").
+        from portagent.packager import package_for
+
+        self.assertNotEqual(package_for("MyGame"), package_for("OtherGame"))
+        self.assertTrue(package_for("My Game!").startswith("dev.exportgame.port."))
+
+    def test_signing_key_persists_across_rebuilds(self):
+        # Android refuses to update an installed app signed with a different key, so
+        # the keystore must be stable across rebuilds of the same work dir.
+        import hashlib
+
+        res = self._package("godot_dotnet")
+        self.assertEqual(res.status, "ok", msg=str(res.logs[-3:]))
+        ks = Path(self.tmp.name) / "pkg_godot_dotnet" / "exportgame.keystore"
+        self.assertTrue(ks.is_file())
+        first = hashlib.sha256(ks.read_bytes()).hexdigest()
+        self._package("godot_dotnet")
+        self.assertEqual(first, hashlib.sha256(ks.read_bytes()).hexdigest())
 
 
 @unittest.skipUnless(find_android_toolchain() is not None,

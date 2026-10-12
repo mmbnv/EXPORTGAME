@@ -109,12 +109,20 @@ is still evolving; heavy ARM64 runtime payloads (Box64/Wine/DXVK) are not vendor
 missing library instead of pretending.
 
 **If a phone still says "package is invalid / corrupt":** the APK is built for Android 5.0–14 and signed
-with v1 + v2 + v3, which every device understands. The usual remaining cause is a *conflicting signature* —
-a build of the same app (`dev.exportgame.port`) is already installed, so Android refuses the new one as
-invalid. Uninstall the old copy first, or install over USB:
+with v1 + v2 + v3, and each build is verified with `apksigner` before it is reported `ok`. The remaining
+cause in almost every case is a **conflicting previous install** — Android will not replace an app whose
+APK was signed with a *different key* (or a different build of the same package), and reports it as
+invalid. Two things make that happen and both are fixed here:
+
+- Each game now gets its own package (`dev.exportgame.port.<game>`), so two different games never collide.
+- The signing key now **persists across rebuilds** (`exportgame.keystore` in the work dir), so a rebuilt
+  APK is a valid update of the previous one instead of a key mismatch.
+
+If you installed an earlier build, uninstall it once (the package shown in the build output), then install:
 
 ```bash
-adb install -r MyGame.apk     # or: adb uninstall dev.exportgame.port && adb install MyGame.apk
+adb uninstall dev.exportgame.port.<game>     # drop any earlier, differently-signed build
+adb install -r MyGame.apk
 ```
 
 `apksigner verify MyGame.apk` (build-tools) confirms the signature; if it prints `Verifies`, the file on

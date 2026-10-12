@@ -210,6 +210,7 @@ def run_port(
         "signed": result.signed,
         "aligned": result.aligned,
         "verified": result.verified,
+        "package": result.package,
         "abis": result.abis,
         "assets": {"files": result.asset_files, "bytes": result.asset_bytes},
         "runtime": runtime.to_dict(),

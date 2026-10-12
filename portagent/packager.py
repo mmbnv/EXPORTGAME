@@ -32,6 +32,35 @@ APP_LABEL = "EXPORTGAME"
 MIN_SDK = 21
 TARGET_SDK = 34
 
+
+def _slug(label: str) -> str:
+    out = "".join(ch.lower() for ch in label if ch.isascii() and ch.isalnum())
+    if not out:
+        out = "game"
+    if out[0].isdigit():
+        out = "g" + out
+    return out[:40]
+
+
+def package_for(label: str) -> str:
+    """One package per game. A shared package makes two different games collide
+    on install ('package is invalid/conflicting'), so derive it from the label."""
+    return f"{PACKAGE}.{_slug(label)}"
+
+
+def _java_dir(proj: Path, package: str) -> Path:
+    return proj.joinpath("java", *package.split("."))
+
+
+def _keystore_path(work_dir: Path) -> Path:
+    """A stable signing key. It must persist across rebuilds: Android refuses to
+    update an installed app whose APK is signed with a different key, which shows
+    up on the device as 'package is invalid or corrupt'."""
+    override = os.environ.get("EXPORTGAME_KEYSTORE")
+    if override:
+        return Path(override).expanduser()
+    return work_dir / "exportgame.keystore"
+
 # 96x96 launcher icon, generated once so the build needs no Pillow at runtime.
 _ICON_PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAACEUlEQVR42u2dwXHCMBBFJQ1FkI5IH6khAxXgSQ3pI+4o7oKczCHjgLVaaVfR"
@@ -53,6 +82,7 @@ class PackageResult:
     signed: bool = False
     aligned: bool = False
     verified: bool = False
+    package: str | None = None
     abis: list[str] = field(default_factory=list)
     asset_files: int = 0
     asset_bytes: int = 0
@@ -70,6 +100,7 @@ class PackageResult:
             "signed": self.signed,
             "aligned": self.aligned,
             "verified": self.verified,
+            "package": self.package,
             "abis": self.abis,
             "asset_files": self.asset_files,
             "asset_bytes": self.asset_bytes,
@@ -172,10 +203,12 @@ class ApkPackager:
         translated: dict,
         plan: OptimizationPlan,
         app_label: str = APP_LABEL,
-        package: str = PACKAGE,
+        package: str | None = None,
         runtime: RuntimeConfig | None = None,
     ) -> PackageResult:
         res = PackageResult()
+        if package is None:
+            package = package_for(app_label)
         # Make the bundled/installed JDK + Android tools callable by name.
         from .tools import prepare_environment
 
@@ -194,7 +227,7 @@ class ApkPackager:
             shutil.rmtree(proj)
         (proj / "res" / "values").mkdir(parents=True, exist_ok=True)
         (proj / "res" / "mipmap-anydpi-v26").mkdir(parents=True, exist_ok=True)
-        (proj / "java" / "dev" / "exportgame" / "port").mkdir(parents=True, exist_ok=True)
+        _java_dir(proj, package).mkdir(parents=True, exist_ok=True)
         (proj / "assets").mkdir(parents=True, exist_ok=True)
         (proj / "compiled").mkdir(parents=True, exist_ok=True)
 
@@ -282,6 +315,7 @@ class ApkPackager:
 
             res.apk = str(final)
             res.apk_size = final.stat().st_size
+            res.package = package
             res.abis = abis
             res.status = "ok" if (res.signed and res.verified) else "partial"
             return res
@@ -293,7 +327,7 @@ class ApkPackager:
     # -- sources ----------------------------------------------------------
     def _write_sources(self, proj: Path, plan: OptimizationPlan, label: str, package: str,
                        runtime: RuntimeConfig | None = None) -> None:
-        jdir = proj / "java" / "dev" / "exportgame" / "port"
+        jdir = _java_dir(proj, package)
         engine = runtime.env.get("PAGENT_ENGINE", label) if runtime else label
         runtime_class = runtime.runtime_class if runtime else "engine_native"
         backend = runtime.backend if runtime else plan.graphics_backend
@@ -670,7 +704,8 @@ class ApkPackager:
             res.logs.append("zipalign failed:\n" + out[-1000:])
 
     def _sign(self, tools: dict[str, str], apk: Path, res: PackageResult) -> None:
-        ks = self.work_dir / "portagent.keystore"
+        ks = _keystore_path(self.work_dir)
+        ks.parent.mkdir(parents=True, exist_ok=True)
         if not ks.exists():
             rc, out = _run([
                 "keytool", "-genkeypair", "-keystore", str(ks), "-alias", "portagent",

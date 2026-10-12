@@ -74,5 +74,10 @@ repo, they almost always want to **mod a game**, or to learn how a game was modd
   as not required. `apksigner` appends `META-INF/MANIFEST.MF` after the `.SF` — that ordering is valid (the
   `jarsigner` JarInputStream warning is a red herring; Android reads the central directory). The build runs
   `apksigner verify` and only reports `ok` when `result.verified` is true.
+- **Install conflicts (do not regress):** Android reports "package is invalid / corrupt" when it cannot
+  *install* the APK — most often a signature or package conflict, not a bad file. So each game gets its own
+  package via `package_for(label)` (`dev.exportgame.port.<slug>`), and the signing key persists across
+  rebuilds (`_keystore_path(work_dir)` → `exportgame.keystore`, overridable with `EXPORTGAME_KEYSTORE`).
+  Regenerating the key per build made every rebuild a key mismatch against an installed copy.
 - **Wording:** keep skills and docs agent-neutral ("the agent", not a product name) except in sections
   about one specific agent.

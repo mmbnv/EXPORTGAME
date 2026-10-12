@@ -266,8 +266,11 @@ class Session:
             print(f"  runtime       : {rt.get('runtime_class', '-')}")
         if s.get("apk"):
             print(f"  apk           : {_wrap(s['apk'], C.GREEN)}")
+            print(f"  package       : {s.get('package', '-')}")
             print(f"  size / signed : {s.get('apk_size', 0)} bytes / "
                   f"signed={s.get('signed')} aligned={s.get('aligned')}")
+            print(_wrap("  to (re)install safely, uninstall any previous EXPORTGAME "
+                        f"build first:  adb uninstall {s.get('package', '')}", C.DIM))
         if s.get("message"):
             print(f"  message       : {s['message']}")
         if s.get("steps"):

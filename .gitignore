@@ -226,3 +226,5 @@ exportgame_all/
 exportgame_memory.sqlite
 *.apk
 tools/
+exportgame.keystore
+*.keystore
