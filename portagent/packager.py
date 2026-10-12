@@ -27,6 +27,22 @@ from .runtime import RuntimeBundler, RuntimeConfig, write_config
 
 PACKAGE = "dev.exportgame.port"
 APP_LABEL = "EXPORTGAME"
+# Broadest practical reach: Android 5.0 (API 21) .. 14 (API 34). API 21 keeps
+# phones that only do v1 (JAR) verification installable.
+MIN_SDK = 21
+TARGET_SDK = 34
+
+# 96x96 launcher icon, generated once so the build needs no Pillow at runtime.
+_ICON_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAACEUlEQVR42u2dwXHCMBBFJQ1FkI5IH6khAxXgSQ3pI+4o7oKczCHjgLVaaVfR"
+    "+3fG8N8+IcOMFYMwx/PpFsg9yzRHyesipdvCiBRvCyJRfr3s6S5Rvi2ERPm2EBLl20JIlG8LIWqU/3n9GLLQt8t78e4olpQ/avEaIFYI"
+    "Bya+PGsfEhAxd/q3ypeq+F+Kl3axTHPMAvD7gqMWr9XLMs0x1b7IiN8BOUt0knz5Ur5OJ8fz6ZZyp5/y90HYa0GiNtskpt/WAgzwbgAB"
+    "AAAIAABAAAAAAgAAEAAAgADgnu/rFwDIoADW6e/ZAgwAgM7a36sFGAAAvZ1PjxZgAAB09/29WYABANC/6+3JAgwAQKgy1b1YgAEAqDfN"
+    "PViAAQCoO8XeLcAAANSfXs8WYAAA2kytVwswAADtptWjBRgAgLZT6s0CDABA++n0ZAEGAMBmKr1YgAEAsJtGDxZgwOgArKfQ+voY"
+    "MLIBXnYilu8DA0Y1wNtvMlbv52D1gV8ur4w/SxAAAEAFAAAAAQAACAAAQAAAAOIMgOSZ+CMn92nzGNDDEoQFdaY/hBCS5CRoIOh0"
+    "knWKUslJQaOVn3PSCAe5KU+96CA3DQgkv/wQhH9JrhcCRPkKwHG2BsVvHmdbCoHkl795HyDZlhJZ+X/eiAGhTfkP74SBUL/8pz9F"
+    "AKFu+U8BAKFu+Zu7oEdhh6RXvAgAMPRXih/AfAX9pk5XcQAAAABJRU5ErkJggg=="
+)
 
 
 @dataclass
@@ -36,6 +52,7 @@ class PackageResult:
     apk_size: int = 0
     signed: bool = False
     aligned: bool = False
+    verified: bool = False
     abis: list[str] = field(default_factory=list)
     asset_files: int = 0
     asset_bytes: int = 0
@@ -52,6 +69,7 @@ class PackageResult:
             "apk_size": self.apk_size,
             "signed": self.signed,
             "aligned": self.aligned,
+            "verified": self.verified,
             "abis": self.abis,
             "asset_files": self.asset_files,
             "asset_bytes": self.asset_bytes,
@@ -200,7 +218,7 @@ class ApkPackager:
 
             # 1) resources
             rc, out = _run([tools["aapt2"], "compile", "--dir", str(proj / "res"),
-                            "-o", str(proj / "compiled" / "res.zip")])
+                            "--no-crunch", "-o", str(proj / "compiled" / "res.zip")])
             res.commands.append("aapt2 compile")
             res.steps["aapt2_compile"] = "ok" if rc == 0 else "fail"
             if rc != 0:
@@ -215,11 +233,12 @@ class ApkPackager:
                 "-o", str(base_apk),
                 "-I", tools["android_jar"],
                 "--manifest", str(manifest),
-                "--min-sdk-version", "26",
-                "--target-sdk-version", "34",
+                "--min-sdk-version", str(MIN_SDK),
+                "--target-sdk-version", str(TARGET_SDK),
                 "--version-code", "1",
                 "--version-name", "1.0",
                 "--auto-add-overlay",
+                "--no-version-vectors",
                 "-R", str(proj / "compiled" / "res.zip"),
             ])
             res.commands.append("aapt2 link")
@@ -242,7 +261,7 @@ class ApkPackager:
                 return res
 
             rc, out = _run([tools["d8"], "--lib", tools["android_jar"],
-                            "--min-api", "26", "--output", str(proj),
+                            "--min-api", str(MIN_SDK), "--output", str(proj),
                             *[str(p) for p in (proj / "classes").rglob("*.class")]])
             res.commands.append("d8")
             res.steps["d8"] = "ok" if rc == 0 else "fail"
@@ -259,11 +278,12 @@ class ApkPackager:
             self._assemble(base_apk, proj, final, res)
             self._align(tools, final, res)
             self._sign(tools, final, res)
+            self._verify(tools, final, res)
 
             res.apk = str(final)
             res.apk_size = final.stat().st_size
             res.abis = abis
-            res.status = "ok" if res.signed else "partial"
+            res.status = "ok" if (res.signed and res.verified) else "partial"
             return res
         except Exception as exc:  # noqa: BLE001 - report, never crash the caller
             res.logs.append(f"packager error: {exc!r}")
@@ -459,6 +479,16 @@ class ApkPackager:
             f'    <string name="app_name">{label}</string>\n</resources>\n',
             encoding="utf-8",
         )
+        self._write_icon(proj)
+
+    def _write_icon(self, proj: Path) -> None:
+        """A real launcher icon: without one some launchers refuse or show a
+        blank tile, and a missing icon is a common install hiccup."""
+        import base64
+
+        icon_dir = proj / "res" / "mipmap-hdpi"
+        icon_dir.mkdir(parents=True, exist_ok=True)
+        (icon_dir / "ic_launcher.png").write_bytes(base64.b64decode(_ICON_PNG_B64))
 
     def _write_manifest(self, proj: Path, plan: OptimizationPlan, label: str, package: str) -> Path:
         large = 'android:largeHeap="true"' if plan.large_heap else ""
@@ -470,9 +500,10 @@ class ApkPackager:
             <manifest xmlns:android="http://schemas.android.com/apk/res/android"
                 package="{package}">
                 <uses-permission android:name="android.permission.INTERNET"/>
-                <uses-feature android:glEsVersion="{gles}" android:required="true"/>
+                <uses-feature android:glEsVersion="{gles}" android:required="false"/>
                 <application
                     android:label="@string/app_name"
+                    android:icon="@mipmap/ic_launcher"
                     android:hasCode="true"
                     {large}
                     android:extractNativeLibs="{extract}">
@@ -655,12 +686,13 @@ class ApkPackager:
             tools["apksigner"], "sign",
             "--ks", str(ks), "--ks-pass", "pass:portagent",
             "--key-pass", "pass:portagent", "--ks-key-alias", "portagent",
-            # v2/v3 only: minSdk is 26 (Android 8+), and a stale v1 JAR block is
-            # what makes some package installers report "package is invalid".
-            "--v1-signing-enabled", "false",
+            # Sign with all three schemes. minSdk is 21, and phones on Android
+            # 5-6 verify only v1 (JAR); omitting it makes those devices reject
+            # the package as "invalid". v2/v3 are added for Android 7+.
+            "--v1-signing-enabled", "true",
             "--v2-signing-enabled", "true",
             "--v3-signing-enabled", "true",
-            "--min-sdk-version", "26",
+            "--min-sdk-version", str(MIN_SDK),
             str(apk),
         ])
         if rc == 0:
@@ -669,3 +701,17 @@ class ApkPackager:
         else:
             res.steps["sign"] = "fail"
             res.logs.append("apksigner failed:\n" + out[-1500:])
+
+    def _verify(self, tools: dict[str, str], apk: Path, res: PackageResult) -> None:
+        """Assert with apksigner what the phone will check, so a build is only
+        called 'ok' when the signature actually validates."""
+        if not res.signed:
+            res.steps["verify"] = "skipped (unsigned)"
+            return
+        rc, out = _run([tools["apksigner"], "verify", "--min-sdk-version", str(MIN_SDK), str(apk)])
+        if rc == 0:
+            res.verified = True
+            res.steps["verify"] = "ok"
+        else:
+            res.steps["verify"] = "fail"
+            res.logs.append("apksigner verify failed:\n" + out[-1500:])

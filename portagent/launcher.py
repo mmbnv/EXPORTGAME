@@ -186,7 +186,8 @@ def run_port(
         if str(apk_out) != result.apk:
             shutil.copy2(result.apk, apk_out)
 
-    _emit(progress, "VERIFY", "signed=%s aligned=%s" % (result.signed, result.aligned))
+    _emit(progress, "VERIFY",
+          "signed=%s aligned=%s verified=%s" % (result.signed, result.aligned, result.verified))
 
     failed_steps = [k for k, v in result.steps.items() if str(v).startswith("fail")]
     if result.status == "ok":
@@ -208,6 +209,7 @@ def run_port(
         "apk_size": result.apk_size,
         "signed": result.signed,
         "aligned": result.aligned,
+        "verified": result.verified,
         "abis": result.abis,
         "assets": {"files": result.asset_files, "bytes": result.asset_bytes},
         "runtime": runtime.to_dict(),

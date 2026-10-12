@@ -149,10 +149,10 @@ class PackagerTests(unittest.TestCase):
         self.assertEqual(cfg["entry"], "IndieGame.exe")
         self.assertEqual(cfg["env"]["PAGENT_STRATEGY"], "native_dbt_box64")
 
-    def test_signed_without_a_stale_v1_block(self):
-        # A leftover v1 JAR signature (META-INF/*.SF with the manifest appended after it) is what
-        # makes package installers report "package is invalid / corrupt". minSdk is 26, so the APK
-        # must be v2/v3 only and carry no v1 files at all.
+    def test_signed_with_consistent_v1_v2_v3(self):
+        # Phones on Android 5-6 verify only v1 (JAR) and reject a v2-only APK as
+        # "invalid". So v1 must be present alongside v2 and v3, and apksigner must
+        # report the v1 scheme as valid.
         import subprocess
         import zipfile
 
@@ -160,14 +160,14 @@ class PackagerTests(unittest.TestCase):
         self.assertEqual(res.status, "ok", msg=str(res.logs[-3:]))
         with zipfile.ZipFile(res.apk) as z:
             names = z.namelist()
-        self.assertFalse([n for n in names if n.endswith(".SF") or n.endswith(".RSA") or n == "META-INF/MANIFEST.MF"],
-                         "v1 JAR signature files must not be present (use --v1-signing-enabled false)")
+        self.assertIn("META-INF/MANIFEST.MF", names)
+        self.assertTrue(any(n.endswith(".SF") for n in names))
         apksigner = find_android_toolchain()["apksigner"]
-        out = subprocess.run([apksigner, "verify", "--verbose", res.apk],
+        out = subprocess.run([apksigner, "verify", "--verbose", "--min-sdk-version", "21", res.apk],
                              capture_output=True, text=True).stdout
         self.assertIn("Verifies", out)
+        self.assertIn("JAR signing): true", out)
         self.assertIn("APK Signature Scheme v2): true", out)
-        self.assertIn("JAR signing): false", out)
 
     def test_native_lib_exports_the_jni_entry_points(self):
         # PortActivity declares nativeBackend()/nativeInit(); if the .so doesn't export
