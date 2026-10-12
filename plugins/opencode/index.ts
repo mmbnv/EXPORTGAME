@@ -44,6 +44,7 @@ function expandPath(path: string, base: string): string {
  */
 const GROUPS = [
   { name: "scan", blurb: "find installed games and report engine, anti-cheat, loaders, saves and modding routes" },
+  { name: "android", blurb: "turn a PC game folder into an installable Android game (signed APK): scan / build / env" },
   { name: "fal", blurb: "generate art through fal: sprites, textures, PBR maps, 3D models, rigs, SFX, music, voice, video" },
   { name: "comfy", blurb: "generate images on a local ComfyUI server, no API key (status / image / run)" },
   { name: "sprite", blurb: "turn generated art into engine-ready sprites: trim, pixelate, palette, sheets and strips" },
